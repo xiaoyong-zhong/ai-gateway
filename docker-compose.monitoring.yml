@@ -1,0 +1,43 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: api-gateway-monitoring-prometheus
+    restart: unless-stopped
+    # 共享网关网络空间，直接采集只监听回环地址的 Envoy 指标。
+    network_mode: container:api-gateway-higress
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.listen-address=0.0.0.0:19090
+    volumes:
+      - ./config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - monitoring_prometheus:/prometheus
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    container_name: api-gateway-grafana
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:3000:3000
+    environment:
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - monitoring_grafana:/var/lib/grafana
+      - ./config/monitoring/provisioning:/etc/grafana/provisioning:ro
+      - ./config/monitoring/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      gateway:
+        ipv4_address: 172.30.50.5
+
+networks:
+  gateway:
+    external: true
+    name: api-gateway-network
+
+volumes:
+  monitoring_prometheus:
+  monitoring_grafana:

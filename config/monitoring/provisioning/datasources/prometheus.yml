@@ -1,0 +1,9 @@
+apiVersion: 1
+datasources:
+  - name: Higress Prometheus
+    uid: higress-prometheus
+    type: prometheus
+    access: proxy
+    url: http://api-gateway-higress:19090
+    isDefault: true
+    editable: false

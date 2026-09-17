@@ -1,0 +1,19 @@
+apiVersion: networking.higress.io/v1
+kind: McpBridge
+metadata:
+  name: default
+  namespace: higress-system
+spec:
+  registries:
+    - name: higress-console
+      type: static
+      domain: 127.0.0.1:8001
+      port: 80
+    - name: benchmark-litellm
+      type: static
+      domain: 172.30.51.2:4000
+      port: 80
+    - name: benchmark-mock
+      type: static
+      domain: 172.30.51.4:9000
+      port: 80

@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: benchmark-full
+  namespace: higress-system
+  annotations:
+    higress.io/destination: benchmark-litellm.static:80
+spec:
+  ingressClassName: higress
+  rules:
+    - http:
+        paths:
+          - path: /v1
+            pathType: Prefix
+            backend:
+              resource:
+                apiGroup: networking.higress.io
+                kind: McpBridge
+                name: default

@@ -1,0 +1,19 @@
+model_list:
+  - model_name: benchmark-chat
+    litellm_params:
+      model: openai/benchmark-chat
+      api_base: http://mock:9000/v1
+      api_key: sk-benchmark
+    model_info:
+      mode: chat
+
+general_settings:
+  master_key: sk-benchmark
+
+router_settings:
+  num_retries: 0
+  fallbacks: []
+
+litellm_settings:
+  num_retries: 0
+  drop_params: true

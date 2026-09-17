@@ -1,0 +1,76 @@
+services:
+  db:
+    image: postgres:16
+    container_name: litellm_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: llmproxy
+      POSTGRES_PASSWORD: dbpassword9090
+    volumes:
+      - litellm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llmproxy -d litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      ai-gateway:
+        ipv4_address: 172.30.50.4
+        aliases:
+          - litellm_db
+          - db
+
+  litellm:
+    image: api-gateway-litellm:responses-empty-choices-v1
+    build:
+      context: ./config/litellm-patch
+    container_name: api-gateway-litellm
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: sk-local-test
+      DATABASE_URL: postgresql://llmproxy:dbpassword9090@db:5432/litellm
+    env_file:
+      - path: ./.env
+        required: false
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./config/litellm.yaml:/app/config.yaml:ro
+    networks:
+      ai-gateway:
+        aliases:
+          - litellm.local
+        ipv4_address: 172.30.50.2
+
+  higress:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/all-in-one:latest
+    container_name: api-gateway-higress
+    restart: unless-stopped
+    depends_on:
+      - litellm
+    ports:
+      - "8001:8001"
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - ./runtime/higress:/data
+    networks:
+      ai-gateway:
+        ipv4_address: 172.30.50.3
+
+networks:
+  ai-gateway:
+    name: api-gateway-network
+    ipam:
+      config:
+        - subnet: 172.30.50.0/24
+
+volumes:
+  litellm_postgres_data:
+    name: litellm_postgres_data
+    external: true

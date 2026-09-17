@@ -1,0 +1,431 @@
+{
+  "uid": "higress-local",
+  "title": "Higress 本地网关监控",
+  "schemaVersion": 41,
+  "version": 1,
+  "timezone": "browser",
+  "refresh": "15s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "description": "入口仅统计 8080/8443，包含模型调用、模型列表查询、鉴权失败及其他 HTTP 请求；累计数从网关进程启动开始。上游仅统计两条 LiteLLM 服务，不包含监控采集和控制面流量。按服务汇总，不能区分具体模型。速率需要两个采样点，无请求时耗时可能无数据。采集 UP 仅表示指标接口可访问。",
+  "panels": [
+    {
+      "id": 1,
+      "title": "指标采集状态（1 正常，0 失败）",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"higress|higress-agent\"}",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "网关进程运行时间",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "envoy_server_uptime{job=\"higress\"}",
+          "legendFormat": "{{http_conn_manager_prefix}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "入口 QPS（按监听器）",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (http_conn_manager_prefix) (rate(envoy_http_downstream_rq_total{job=\"higress\",http_conn_manager_prefix=~\"outbound_0[.]0[.]0[.]0_(8080|8443)\"}[$__rate_interval]))",
+          "legendFormat": "{{http_conn_manager_prefix}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "入口 HTTP 状态码",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (response_code_class) (rate(envoy_http_downstream_rq{job=\"higress\",http_conn_manager_prefix=~\"outbound_0[.]0[.]0[.]0_(8080|8443)\"}[$__rate_interval]))",
+          "legendFormat": "{{response_code_class}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "业务入口请求累计数（8080/8443，启动以来）",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(envoy_http_downstream_rq_total{job=\"higress\",http_conn_manager_prefix=~\"outbound_0[.]0[.]0[.]0_(8080|8443)\"})",
+          "legendFormat": "{{http_conn_manager_prefix}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "入口 5xx 比例（无请求时无数据）",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum(rate(envoy_http_downstream_rq{job=\"higress\",http_conn_manager_prefix=~\"outbound_0[.]0[.]0[.]0_(8080|8443)\",response_code_class=\"5xx\"}[$__rate_interval])) / sum(rate(envoy_http_downstream_rq_total{job=\"higress\",http_conn_manager_prefix=~\"outbound_0[.]0[.]0[.]0_(8080|8443)\"}[$__rate_interval]))",
+          "legendFormat": "{{http_conn_manager_prefix}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "LiteLLM 上游请求速率（按服务）",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (cluster_name) (rate(envoy_cluster_upstream_rq_total{job=\"higress\",cluster_name=~\"outbound[|]80[|][|](litellm|llm-litellm[.]internal)[.]static\"}[$__rate_interval]))",
+          "legendFormat": "{{cluster_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "上游超时 / 秒",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (cluster_name) (rate(envoy_cluster_upstream_rq_timeout{job=\"higress\",cluster_name=~\"outbound[|]80[|][|](litellm|llm-litellm[.]internal)[.]static\"}[$__rate_interval]))",
+          "legendFormat": "{{cluster_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "上游重试 / 秒",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (cluster_name) (rate(envoy_cluster_upstream_rq_retry{job=\"higress\",cluster_name=~\"outbound[|]80[|][|](litellm|llm-litellm[.]internal)[.]static\"}[$__rate_interval]))",
+          "legendFormat": "{{cluster_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "上游平均请求耗时",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (cluster_name) (rate(envoy_cluster_upstream_rq_time_sum{job=\"higress\",cluster_name=~\"outbound[|]80[|][|](litellm|llm-litellm[.]internal)[.]static\"}[$__rate_interval])) / sum by (cluster_name) (rate(envoy_cluster_upstream_rq_time_count{job=\"higress\",cluster_name=~\"outbound[|]80[|][|](litellm|llm-litellm[.]internal)[.]static\"}[$__rate_interval]))",
+          "legendFormat": "{{cluster_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "活跃 / 预热中的监听器",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "envoy_listener_manager_total_listeners_active{job=\"higress\"} or envoy_listener_manager_total_listeners_warming{job=\"higress\"}",
+          "legendFormat": "{{__name__}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "入口活跃请求",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "higress-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (http_conn_manager_prefix) (envoy_http_downstream_rq_active{job=\"higress\",http_conn_manager_prefix=~\"outbound_0[.]0[.]0[.]0_(8080|8443)\"})",
+          "legendFormat": "{{http_conn_manager_prefix}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    }
+  ]
+}
