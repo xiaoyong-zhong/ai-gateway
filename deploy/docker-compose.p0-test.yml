@@ -1,0 +1,133 @@
+name: api-gateway-p0-test
+
+services:
+  db:
+    image: postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: llmproxy
+      POSTGRES_PASSWORD: ${P0_POSTGRES_PASSWORD:?Run scripts/Initialize-P0TestEnvironment.ps1 first}
+    volumes:
+      - p0_litellm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llmproxy -d litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      p0-gateway:
+        ipv4_address: 172.30.52.4
+
+  redis:
+    image: redis@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - p0_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      p0-gateway:
+        ipv4_address: 172.30.52.5
+
+  litellm:
+    image: api-gateway-litellm:responses-empty-choices-v1
+    build:
+      context: ../gateway/litellm
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${P0_LITELLM_MASTER_KEY:?Run scripts/Initialize-P0TestEnvironment.ps1 first}
+      DATABASE_URL: postgresql://llmproxy:${P0_POSTGRES_PASSWORD}@db:5432/litellm
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      NO_PROXY: "*"
+    env_file:
+      - path: ../.env
+        required: false
+    ports:
+      - "127.0.0.1:14000:4000"
+    volumes:
+      - ../config/litellm.yaml:/app/config.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os, urllib.request; r=urllib.request.Request('http://localhost:4000/v1/models', headers={'Authorization': 'Bearer '+os.environ['LITELLM_MASTER_KEY']}); assert urllib.request.urlopen(r, timeout=3).status == 200\""]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+    networks:
+      p0-gateway:
+        ipv4_address: 172.30.52.2
+
+  higress:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/all-in-one@sha256:930b314be06e4b435617a39ac8dc8f17c9d60a4faf2c96aa7aafe9e85381ad9b
+    restart: unless-stopped
+    depends_on:
+      litellm:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:18001:8001"
+      - "127.0.0.1:18080:8080"
+      - "127.0.0.1:18000:15000"
+    volumes:
+      - ../runtime/p0-test/higress:/data
+      - ../scripts:/p0-scripts:ro
+      - ../config/higress/p0-test:/p0-config:ro
+      - ../.env.p0-test:/p0-env/.env.p0-test:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -kfsS --max-time 3 https://127.0.0.1:18443/version >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    networks:
+      p0-gateway:
+        ipv4_address: 172.30.52.3
+
+  log-pruner:
+    image: postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+    restart: unless-stopped
+    depends_on:
+      litellm:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${P0_POSTGRES_PASSWORD:?Run scripts/Initialize-P0TestEnvironment.ps1 first}
+      P0_LOG_RETENTION_DAYS: ${P0_LOG_RETENTION_DAYS:-7}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        case "$${P0_LOG_RETENTION_DAYS}" in
+          ''|*[!0-9]*) echo 'P0_LOG_RETENTION_DAYS must be a non-negative integer' >&2; exit 2 ;;
+        esac
+        while true; do
+          psql -h db -U llmproxy -d litellm -v ON_ERROR_STOP=1 \
+            -c "DELETE FROM \"LiteLLM_SpendLogs\" WHERE \"endTime\" < NOW() - (INTERVAL '1 day' * $${P0_LOG_RETENTION_DAYS});"
+          sleep 86400
+        done
+    networks:
+      p0-gateway:
+        ipv4_address: 172.30.52.6
+
+networks:
+  p0-gateway:
+    name: api-gateway-p0-test-network
+    ipam:
+      config:
+        - subnet: 172.30.52.0/24
+
+volumes:
+  p0_litellm_postgres_data:
+    name: api-gateway-p0-test-postgres
+  p0_redis_data:
+    name: api-gateway-p0-test-redis

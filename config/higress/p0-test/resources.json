@@ -1,0 +1,182 @@
+[
+  {
+    "apiVersion": "networking.higress.io/v1",
+    "kind": "McpBridge",
+    "metadata": {"name": "default", "namespace": "higress-system"},
+    "spec": {
+      "registries": [
+        {"name": "p0-litellm.internal", "domain": "172.30.52.2:4000", "port": 80, "protocol": "http", "type": "static"},
+        {"name": "p0-redis.internal", "domain": "172.30.52.5:6379", "port": 6379, "protocol": "tcp", "type": "static"}
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "Ingress",
+    "metadata": {
+      "name": "p0-ai-gateway-test",
+      "namespace": "higress-system",
+      "annotations": {
+        "higress.io/destination": "p0-litellm.internal.static:80",
+        "higress.io/enable-proxy-next-upstream": "true",
+        "higress.io/proxy-next-upstream": "error,timeout",
+        "higress.io/proxy-next-upstream-timeout": "120",
+        "higress.io/proxy-next-upstream-tries": "2"
+      }
+    },
+    "spec": {
+      "ingressClassName": "higress",
+      "rules": [{
+        "host": "ai-gateway-test.local",
+        "http": {"paths": [{
+          "path": "/v1",
+          "pathType": "Prefix",
+          "backend": {"resource": {"apiGroup": "networking.higress.io", "kind": "McpBridge", "name": "default"}}
+        }]}
+      }]
+    }
+  },
+  {
+    "apiVersion": "extensions.higress.io/v1alpha1",
+    "kind": "WasmPlugin",
+    "metadata": {"name": "p0-key-auth", "namespace": "higress-system"},
+    "spec": {
+      "phase": "AUTHN",
+      "priority": 310,
+      "failStrategy": "FAIL_CLOSE",
+      "url": "http://localhost:8002/plugins/key-auth/2.0.0/plugin.wasm",
+      "defaultConfigDisable": false,
+      "defaultConfig": {
+        "global_auth": false,
+        "keys": ["Authorization"],
+        "allow": [],
+        "consumers": [{
+          "name": "p0-ccswitch",
+          "keys": ["Authorization"],
+          "credentials": ["Bearer ${P0_HIGRESS_CONSUMER_KEY}"],
+          "in_header": true,
+          "in_query": false
+        }]
+      },
+      "matchRules": [{
+        "ingress": ["p0-ai-gateway-test"],
+        "configDisable": false,
+        "config": {"allow": ["p0-ccswitch", "p0-legacy"]}
+      }]
+    }
+  },
+  {
+    "apiVersion": "extensions.higress.io/v1alpha1",
+    "kind": "WasmPlugin",
+    "metadata": {"name": "p0-strip-original-auth", "namespace": "higress-system"},
+    "spec": {
+      "priority": 50,
+      "failStrategy": "FAIL_CLOSE",
+      "url": "http://localhost:8002/plugins/transformer/2.0.1/plugin.wasm",
+      "defaultConfigDisable": true,
+      "matchRules": [{
+        "service": ["p0-litellm.internal.static"],
+        "configDisable": false,
+        "config": {
+          "reroute": false,
+          "reqRules": [{"operate": "remove", "headers": [{"key": "x-hi-original-auth"}]}]
+        }
+      }]
+    }
+  },
+  {
+    "apiVersion": "extensions.higress.io/v1alpha1",
+    "kind": "WasmPlugin",
+    "metadata": {"name": "p0-ai-proxy", "namespace": "higress-system"},
+    "spec": {
+      "priority": 100,
+      "failStrategy": "FAIL_CLOSE",
+      "url": "http://localhost:8002/plugins/ai-proxy/2.0.1/plugin.wasm",
+      "defaultConfigDisable": false,
+      "defaultConfig": {
+        "providers": [{
+          "id": "p0-litellm",
+          "type": "openai",
+          "protocol": "openai",
+          "openaiCustomUrl": "http://172.30.52.2:4000/v1",
+          "openaiExtraCustomUrls": [],
+          "apiTokens": ["${P0_LITELLM_MASTER_KEY}"],
+          "failover": {"enabled": false},
+          "retryOnFailure": {"enabled": false}
+        }]
+      },
+      "matchRules": [{
+        "service": ["p0-litellm.internal.static"],
+        "configDisable": false,
+        "config": {"activeProviderId": "p0-litellm"}
+      }]
+    }
+  },
+  {
+    "apiVersion": "extensions.higress.io/v1alpha1",
+    "kind": "WasmPlugin",
+    "metadata": {"name": "p0-cluster-key-rate-limit", "namespace": "higress-system"},
+    "spec": {
+      "priority": 20,
+      "failStrategy": "FAIL_CLOSE",
+      "url": "http://localhost:8002/plugins/cluster-key-rate-limit/2.0.1/plugin.wasm",
+      "defaultConfigDisable": true,
+      "matchRules": [{
+        "ingress": ["p0-ai-gateway-test"],
+        "configDisable": false,
+        "config": {
+          "rule_name": "p0-consumer-rpm",
+          "show_limit_quota_header": true,
+          "rejected_code": 429,
+          "rejected_msg": "{\"error\":{\"message\":\"P0 request rate limit exceeded\",\"type\":\"rate_limit_error\",\"code\":\"rate_limit_exceeded\"}}",
+          "rule_items": [{
+            "limit_by_per_consumer": "",
+            "limit_keys": [{"key": "*", "query_per_minute": 10}]
+          }],
+          "redis": {"service_name": "p0-redis.internal.static", "service_port": 6379, "database": 0, "timeout": 1000}
+        }
+      }]
+    }
+  },
+  {
+    "apiVersion": "extensions.higress.io/v1alpha1",
+    "kind": "WasmPlugin",
+    "metadata": {"name": "p0-ai-token-rate-limit", "namespace": "higress-system"},
+    "spec": {
+      "priority": 600,
+      "failStrategy": "FAIL_CLOSE",
+      "url": "http://localhost:8002/plugins/ai-token-ratelimit/2.0.1/plugin.wasm",
+      "defaultConfigDisable": true,
+      "matchRules": [{
+        "ingress": ["p0-ai-gateway-test"],
+        "configDisable": false,
+        "config": {
+          "rule_name": "p0-consumer-tpm",
+          "rejected_code": 429,
+          "rejected_msg": "{\"error\":{\"message\":\"P0 token rate limit exceeded\",\"type\":\"rate_limit_error\",\"code\":\"token_rate_limit_exceeded\"}}",
+          "rule_items": [{
+            "limit_by_per_consumer": "",
+            "limit_keys": [{"key": "*", "token_per_minute": 20000}]
+          }],
+          "redis": {"service_name": "p0-redis.internal.static", "service_port": 6379, "database": 1, "timeout": 1000}
+        }
+      }]
+    }
+  },
+  {
+    "apiVersion": "extensions.higress.io/v1alpha1",
+    "kind": "WasmPlugin",
+    "metadata": {"name": "p0-ai-statistics", "namespace": "higress-system"},
+    "spec": {
+      "priority": 900,
+      "failStrategy": "FAIL_OPEN",
+      "url": "http://localhost:8002/plugins/ai-statistics/2.0.1/plugin.wasm",
+      "defaultConfigDisable": true,
+      "matchRules": [{
+        "service": ["p0-litellm.internal.static"],
+        "configDisable": false,
+        "config": {"use_default_response_attributes": true}
+      }]
+    }
+  }
+]

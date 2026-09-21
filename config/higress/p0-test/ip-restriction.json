@@ -1,0 +1,31 @@
+[
+  {
+    "apiVersion": "extensions.higress.io/v1alpha1",
+    "kind": "WasmPlugin",
+    "metadata": {"name": "p0-ip-restriction", "namespace": "higress-system"},
+    "spec": {
+      "phase": "SECURITY_CONTROLS",
+      "priority": 300,
+      "failStrategy": "FAIL_CLOSE",
+      "url": "http://localhost:8002/plugins/ip-restriction/2.0.1/plugin.wasm",
+      "defaultConfigDisable": true,
+      "matchRules": [{
+        "ingress": ["p0-ai-gateway-test"],
+        "configDisable": false,
+        "config": {
+          "allowlist": [
+            "127.0.0.1/32",
+            "172.30.52.0/24",
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16"
+          ],
+          "denylist": [],
+          "enable_whitelist_mode": true,
+          "rejected_code": 403,
+          "rejected_msg": "{\"error\":{\"message\":\"IP not in allowed range\",\"type\":\"ip_restriction_error\",\"code\":\"ip_not_allowed\"}}"
+        }
+      }]
+    }
+  }
+]

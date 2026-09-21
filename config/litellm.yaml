@@ -1,7 +1,7 @@
 model_list:
-  - model_name: my-kimi-k2.7-code
+  - model_name: my-qwen3.7-flash-2026-07-15
     litellm_params:
-      model: openai/kimi-k2.7-code
+      model: openai/qwen3.7-flash-2026-07-15
       api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
       api_key: os.environ/DASHSCOPE_API_KEY
       use_chat_completions_api: true
@@ -13,9 +13,9 @@ model_list:
       api_key: os.environ/DASHSCOPE_API_KEY
       use_chat_completions_api: true
 
-  - model_name: qwen3.7-flash
+  - model_name: my-qwen3.7-flash
     litellm_params:
-      model: openai/qwen3.5-ocr
+      model: openai/qwen3.7-flash
       api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
       api_key: os.environ/DASHSCOPE_API_KEY
       use_chat_completions_api: true

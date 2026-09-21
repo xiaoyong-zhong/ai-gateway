@@ -1,5 +1,9 @@
 runtime/
 .env
+.env.p0-test
+.env.p0-test.*
+.env.p0-test-*
+config/higress/p0-test/backups/
 __pycache__/
 *.pyc
 .pytest_cache/
