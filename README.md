@@ -56,7 +56,7 @@ Copy-Item .env.example .env
 
 编辑 `.env`，至少配置实际使用模型对应的供应商密钥，例如 `DASHSCOPE_API_KEY`、`ZHILIN_aigc_API_KEY`、`DEEPSEEK_API_KEY` 或 `AGNES_API_KEY`。`.env` 已被 Git 忽略，请勿提交真实密钥。
 
-LiteLLM 主密钥在 `docker-compose.yml` 中默认是本地测试值 `sk-local-test`。生产环境应替换为安全密钥，并同步调整调用方配置。
+LiteLLM 主密钥在 `deploy/docker-compose.yml` 中默认是本地测试值 `sk-local-test`。生产环境应替换为安全密钥，并同步调整调用方配置。
 
 ### 启动主环境
 
@@ -64,8 +64,8 @@ LiteLLM 主密钥在 `docker-compose.yml` 中默认是本地测试值 `sk-local-
 
 ```powershell
 docker volume create litellm_postgres_data
-docker compose up -d --build
-docker compose ps
+docker compose -f deploy/docker-compose.yml up -d --build
+docker compose -f deploy/docker-compose.yml ps
 ```
 
 检查服务：
@@ -102,26 +102,26 @@ Invoke-RestMethod `
 模型别名和上游地址位于 [`config/litellm.yaml`](config/litellm.yaml)。当前配置包含 DashScope、校园 AIGC、DeepSeek 和 Agnes AI 的示例。修改后重启：
 
 ```powershell
-docker compose up -d --build litellm
+docker compose -f deploy/docker-compose.yml up -d --build litellm
 ```
 
 上游 API Key 通过 `os.environ/...` 引用环境变量，不要把密钥直接写入 YAML。LiteLLM 的虚拟 Key、团队和预算策略通过管理接口或控制台配置。
 
 ## Responses 兼容补丁
 
-`config/litellm-patch/` 提供自定义 LiteLLM 镜像和回调，主要处理流式空 `choices` 的 `IndexError`，并为指定 Qwen 模型合并前置文本型 system/developer 指令。构建：
+`gateway/litellm/` 提供自定义 LiteLLM 镜像和回调，主要处理流式空 `choices` 的 `IndexError`，并为指定 Qwen 模型合并前置文本型 system/developer 指令。构建：
 
 ```powershell
-docker compose build litellm
-docker compose up -d --no-deps --no-build litellm
+docker compose -f deploy/docker-compose.yml build litellm
+docker compose -f deploy/docker-compose.yml up -d --no-deps --no-build litellm
 ```
 
-详细范围、限制和回滚方式见 [`config/litellm-patch/README.md`](config/litellm-patch/README.md)。
+详细范围、限制和回滚方式见 [`gateway/litellm/README.md`](gateway/litellm/README.md)。
 
 ## 监控
 
 ```powershell
-docker compose -f docker-compose.monitoring.yml up -d
+docker compose -f deploy/docker-compose.monitoring.yml up -d
 ```
 
 - Grafana：<http://localhost:3000>
@@ -153,8 +153,8 @@ python -X utf8 test/test_higress_route.py
 压测使用独立的 `172.30.51.0/24` 网络和 mock 上游：
 
 ```powershell
-docker compose -f docker-compose.benchmark.yml up -d --wait --wait-timeout 180
-docker compose -f docker-compose.benchmark.yml run --rm `
+docker compose -f deploy/docker-compose.benchmark.yml up -d --wait --wait-timeout 180
+docker compose -f deploy/docker-compose.benchmark.yml run --rm `
   -e TARGET=full -e VUS=10 -e DURATION=30s k6 run /bench/gateway.k6.js
 ```
 
@@ -163,23 +163,23 @@ docker compose -f docker-compose.benchmark.yml run --rm `
 ## 目录说明
 
 ```text
-config/                 LiteLLM、监控和自定义补丁配置
+config/                 LiteLLM、监控配置
+deploy/                 Docker Compose 部署编排
+gateway/                网关扩展代码 (补丁、回调、回滚)
 doc/                    架构、部署、验证和压测文档
-runtime/                Higress 运行时配置及测试报告
+runtime/                Higress 运行时配置及测试报告 (Git 忽略)
+scripts/                诊断脚本、抓包数据与历史参考
 sources/higress-src/    Higress 源码快照
 sources/litellm-src/    LiteLLM 源码快照
 test/                   功能、韧性、路由和压测脚本
-docker-compose.yml      主环境
-docker-compose.monitoring.yml 监控环境
-docker-compose.benchmark.yml  隔离压测环境
 ```
 
 ## 停止与清理
 
 ```powershell
-docker compose down
-docker compose -f docker-compose.monitoring.yml down
-docker compose -f docker-compose.benchmark.yml down -v
+docker compose -f deploy/docker-compose.yml down
+docker compose -f deploy/docker-compose.monitoring.yml down
+docker compose -f deploy/docker-compose.benchmark.yml down -v
 ```
 
 主环境停止时默认保留 `litellm_postgres_data`。确认无需数据后再执行 `docker volume rm litellm_postgres_data`。

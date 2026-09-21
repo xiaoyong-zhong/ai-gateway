@@ -11,7 +11,7 @@ services:
       - --storage.tsdb.retention.time=7d
       - --web.listen-address=0.0.0.0:19090
     volumes:
-      - ./config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - monitoring_prometheus:/prometheus
 
   grafana:
@@ -27,8 +27,8 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - monitoring_grafana:/var/lib/grafana
-      - ./config/monitoring/provisioning:/etc/grafana/provisioning:ro
-      - ./config/monitoring/dashboards:/var/lib/grafana/dashboards:ro
+      - ../config/monitoring/provisioning:/etc/grafana/provisioning:ro
+      - ../config/monitoring/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       gateway:
         ipv4_address: 172.30.50.5

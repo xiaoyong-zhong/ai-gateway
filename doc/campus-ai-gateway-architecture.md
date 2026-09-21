@@ -458,11 +458,11 @@ Higress uses a Kubernetes-style control plane stored as YAML on disk. The embedd
 | Component | Reload Method | Trigger |
 |---|---|---|
 | Higress (Envoy) | Hot reload via xDS | Controller watches `/data` directory; YAML changes push xDS to Envoy — no restart |
-| LiteLLM | Container restart | `config.yaml` mounted read-only; changes require `docker compose restart litellm` |
+| LiteLLM | Container restart | `config.yaml` mounted read-only; changes require `docker compose -f deploy/docker-compose.yml restart litellm` |
 | Prometheus | File watch + SIGHUP | Watches `prometheus.yml` on disk; edits on host trigger auto-reload |
 | Grafana | Provisioning auto-reload | Dashboard provider scans every 10s for new/changed JSON |
 | PostgreSQL | Container recreation | Env vars set at container creation |
-| LiteLLM patches | Image rebuild | Streaming patches applied at build; requires `docker compose build litellm` |
+| LiteLLM patches | Image rebuild | Streaming patches applied at build; requires `docker compose -f deploy/docker-compose.yml build litellm` |
 | LiteLLM callback | Image rebuild | `gateway_responses_compat.py` COPYed at build (not volume-mounted) |
 
 ---
@@ -607,7 +607,7 @@ graph TD
 1. Create external Docker volume: `docker volume create litellm_postgres_data`
 2. Copy `.env.example` to `.env` and populate with real API keys
 3. Ensure `runtime/higress/` directory has valid YAML configs (in case of fresh clone)
-4. Build LiteLLM patched image: `docker compose build litellm` (runs 13 build-time tests)
+4. Build LiteLLM patched image: `docker compose -f deploy/docker-compose.yml build litellm` (runs 13 build-time tests)
 
 ### 7.4 Benchmark Deployment (separate environment)
 

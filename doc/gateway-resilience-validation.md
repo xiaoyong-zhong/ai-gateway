@@ -96,8 +96,8 @@ P50/P95 使用 nearest-rank 方法，小样本的 P95 常等于最大值，只�
 日志查看：
 
 ```powershell
-docker compose logs --since 10m litellm
-docker compose logs --since 10m higress
+docker compose -f deploy/docker-compose.yml logs --since 10m litellm
+docker compose -f deploy/docker-compose.yml logs --since 10m higress
 ```
 
 不要把关闭整个正常服务当作首选测试方式；优先隔离故障路由，避免干扰正在进行的其他测试。

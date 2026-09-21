@@ -152,8 +152,8 @@ graph TB
 
 | Patch | 文件路径 | 职责 |
 |---|---|---|
-| **流式迭代器防护** | `config/litellm-patch/patch_streaming.py` | 对 `streaming_iterator.py` 进行 3 处精确修改：在 `_ensure_output_item_for_chunk` 中跳过空 choices 数据块、在 `_is_reasoning_end` 中对空 choices 返回 False、在文本增量提取中对空 choices 返回空字符串 |
-| **Qwen Responses 回调** | `config/litellm-patch/gateway_responses_compat.py` | `QwenResponsesCompatibility` 回调类；在模型 `my-qwen3.6-27b` 的 `aresponses` 调用类型下激活；将开头的 `system`/`developer` 消息合并到 `instructions` 字段，避免 Qwen 聊天模板拒绝重复系统消息 |
+| **流式迭代器防护** | `gateway/litellm/patch/streaming_empty_choices.py` | 对 `streaming_iterator.py` 进行 3 处精确修改：在 `_ensure_output_item_for_chunk` 中跳过空 choices 数据块、在 `_is_reasoning_end` 中对空 choices 返回 False、在文本增量提取中对空 choices 返回空字符串 |
+| **Qwen Responses 回调** | `gateway/litellm/callback/qwen_responses_compat.py` | `QwenResponsesCompatibility` 回调类；在模型 `my-qwen3.6-27b` 的 `aresponses` 调用类型下激活；将开头的 `system`/`developer` 消息合并到 `instructions` 字段，避免 Qwen 聊天模板拒绝重复系统消息 |
 
 ---
 
@@ -356,8 +356,8 @@ config/litellm.yaml
 | 组件 | 重载方式 | 说明 |
 |---|---|---|
 | **Higress** | xDS 热重载 | 控制器监控 `runtime/higress/` 目录，YAML 变更触发 xDS 推送至 Envoy，无需重启 |
-| **LiteLLM config.yaml** | 需重启容器 | 只读挂载，编辑 `config/litellm.yaml` 后需 `docker compose restart litellm` |
-| **LiteLLM Patch** | 需重建镜像 | `patch_streaming.py` 在构建时运行，需 `docker compose build litellm` 后重启 |
+| **LiteLLM config.yaml** | 需重启容器 | 只读挂载，编辑 `config/litellm.yaml` 后需 `docker compose -f deploy/docker-compose.yml restart litellm` |
+| **LiteLLM Patch** | 需重建镜像 | `patch_streaming.py` 在构建时运行，需 `docker compose -f deploy/docker-compose.yml build litellm` 后重启 |
 | **LiteLLM 回调** | 需重建镜像 | `gateway_responses_compat.py` 在构建时 COPY 进镜像，需重建后重启 |
 | **Prometheus** | 文件监控 + SIGHUP | `config/monitoring/prometheus.yml` 磁盘变更时自动重载 |
 | **Grafana 仪表板** | 每 10 秒自动重载 | 配置目录扫描变更，数据源和仪表板 JSON 重新读取 |

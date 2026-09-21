@@ -5,9 +5,9 @@ services:
     image: node:24-alpine
     command: ["node", "/bench/init.mjs"]
     volumes:
-      - ./test/benchmark:/bench:ro
-      - ./runtime/gateway-benchmark/higress:/data
-      - ./runtime/gateway-benchmark/reports:/reports
+      - ../test/benchmark:/bench:ro
+      - ../runtime/gateway-benchmark/higress:/data
+      - ../runtime/gateway-benchmark/reports:/reports
     networks: [benchmark]
 
   mock:
@@ -19,7 +19,7 @@ services:
       MOCK_STREAM_CHUNKS: ${MOCK_STREAM_CHUNKS:-10}
       MOCK_STREAM_INTERVAL_MS: ${MOCK_STREAM_INTERVAL_MS:-50}
     volumes:
-      - ./test/benchmark:/bench:ro
+      - ../test/benchmark:/bench:ro
     ports: ["127.0.0.1:19000:9000"]
     networks:
       benchmark:
@@ -34,7 +34,7 @@ services:
     image: docker.litellm.ai/berriai/litellm:main-stable
     command: ["--config", "/bench/litellm.yaml", "--port", "4000"]
     volumes:
-      - ./test/benchmark:/bench:ro
+      - ../test/benchmark:/bench:ro
     ports: ["127.0.0.1:14000:4000"]
     depends_on:
       mock:
@@ -52,7 +52,7 @@ services:
   higress:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/all-in-one:latest
     volumes:
-      - ./runtime/gateway-benchmark/higress:/data
+      - ../runtime/gateway-benchmark/higress:/data
     ports:
       - "127.0.0.1:18080:8080"
       - "127.0.0.1:18001:8001"
@@ -75,8 +75,8 @@ services:
     image: grafana/k6:1.3.0
     profiles: [tools]
     volumes:
-      - ./test/benchmark:/bench:ro
-      - ./runtime/gateway-benchmark/reports:/reports
+      - ../test/benchmark:/bench:ro
+      - ../runtime/gateway-benchmark/reports:/reports
     networks: [benchmark]
 
 networks:

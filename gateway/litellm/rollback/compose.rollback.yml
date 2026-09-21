@@ -2,4 +2,4 @@ services:
   litellm:
     image: docker.litellm.ai/berriai/litellm@sha256:c8756e7b9a61fe45df2ccb5b781d388c3b2f3a21ef9e4956630caef20f9f03aa
     volumes:
-      - ./config/litellm-patch/gateway_responses_compat.py:/app/gateway_responses_compat.py:ro
+      - ../gateway/litellm/callback/qwen_responses_compat.py:/app/qwen_responses_compat.py:ro

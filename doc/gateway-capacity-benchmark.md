@@ -23,7 +23,7 @@ Higress 测试路由仅转发，不启用额外鉴权、限流或审计插件；
 在项目根目录 PowerShell 执行：
 
 ```powershell
-docker compose -f docker-compose.benchmark.yml up -d --wait --wait-timeout 180
+docker compose -f deploy/docker-compose.benchmark.yml up -d --wait --wait-timeout 180
 ```
 
 需要 Docker Desktop。第一次会拉取镜像并启动服务；k6 在第一次运行时拉取镜像。
@@ -46,7 +46,7 @@ docker compose -f docker-compose.benchmark.yml up -d --wait --wait-timeout 180
 
 ```powershell
 foreach ($target in @('mock','litellm','higress','full')) {
-    docker compose -f docker-compose.benchmark.yml run --rm -e "TARGET=$target" -e LOAD_MODE=rate -e RPS=5 -e VUS=10 -e DURATION=10s k6 run /bench/gateway.k6.js
+    docker compose -f deploy/docker-compose.benchmark.yml run --rm -e "TARGET=$target" -e LOAD_MODE=rate -e RPS=5 -e VUS=10 -e DURATION=10s k6 run /bench/gateway.k6.js
     if ($LASTEXITCODE -ne 0) { break }
 }
 ```
@@ -59,7 +59,7 @@ foreach ($target in @('mock','litellm','higress','full')) {
 先测试完整链路，同时在途请求数为 10，持续 30 秒：
 
 ```powershell
-docker compose -f docker-compose.benchmark.yml run --rm -e TARGET=full -e VUS=10 -e DURATION=30s k6 run /bench/gateway.k6.js
+docker compose -f deploy/docker-compose.benchmark.yml run --rm -e TARGET=full -e VUS=10 -e DURATION=30s k6 run /bench/gateway.k6.js
 ```
 
 `VUS` 是虚拟用户数，每个用户串行发送一个请求，收到完整响应后再发下一个，无额外思考间隔。
@@ -72,7 +72,7 @@ docker compose -f docker-compose.benchmark.yml run --rm -e TARGET=full -e VUS=10
 固定并发在服务变慢时会自然降低请求速率。为了观察队列堆积，可用固定到达速率：
 
 ```powershell
-docker compose -f docker-compose.benchmark.yml run --rm -e TARGET=full -e LOAD_MODE=rate -e RPS=50 -e VUS=20 -e MAX_VUS=200 -e DURATION=30s k6 run /bench/gateway.k6.js
+docker compose -f deploy/docker-compose.benchmark.yml run --rm -e TARGET=full -e LOAD_MODE=rate -e RPS=50 -e VUS=20 -e MAX_VUS=200 -e DURATION=30s k6 run /bench/gateway.k6.js
 ```
 
 这里目标为每秒发起 50 次请求，预分配 20 个用户，最多使用 200 个。
@@ -90,7 +90,7 @@ docker compose -f docker-compose.benchmark.yml run --rm -e TARGET=full -e LOAD_M
 加上结束事件和 `[DONE]`。固定答案用于校验完整性；usage 是占位值，不能用来分析真实模型 token/s。
 
 ```powershell
-docker compose -f docker-compose.benchmark.yml run --rm -e TARGET=full -e STREAM=1 -e VUS=20 -e DURATION=30s k6 run /bench/gateway.k6.js
+docker compose -f deploy/docker-compose.benchmark.yml run --rm -e TARGET=full -e STREAM=1 -e VUS=20 -e DURATION=30s k6 run /bench/gateway.k6.js
 ```
 
 流式校验完整文字、结束原因和 `[DONE]`。k6 的 HTTP 调用会等完整响应后返回，
@@ -101,8 +101,8 @@ docker compose -f docker-compose.benchmark.yml run --rm -e TARGET=full -e STREAM
 ```powershell
 $env:MOCK_DELAY_MS = '100'
 $env:MOCK_RESPONSE_CHARS = '8192'
-docker compose -f docker-compose.benchmark.yml up -d --wait --wait-timeout 180
-docker compose -f docker-compose.benchmark.yml run --rm -e TARGET=full -e INPUT_CHARS=4096 -e RESPONSE_CHARS=8192 -e VUS=20 -e DURATION=30s k6 run /bench/gateway.k6.js
+docker compose -f deploy/docker-compose.benchmark.yml up -d --wait --wait-timeout 180
+docker compose -f deploy/docker-compose.benchmark.yml run --rm -e TARGET=full -e INPUT_CHARS=4096 -e RESPONSE_CHARS=8192 -e VUS=20 -e DURATION=30s k6 run /bench/gateway.k6.js
 ```
 
 `RESPONSE_CHARS` 必须匹配模拟服务的 `MOCK_RESPONSE_CHARS`，否则内容校验失败。
@@ -113,7 +113,7 @@ docker compose -f docker-compose.benchmark.yml run --rm -e TARGET=full -e INPUT_
 
 ```powershell
 Remove-Item Env:MOCK_DELAY_MS,Env:MOCK_RESPONSE_CHARS -ErrorAction SilentlyContinue
-docker compose -f docker-compose.benchmark.yml up -d --wait --wait-timeout 180
+docker compose -f deploy/docker-compose.benchmark.yml up -d --wait --wait-timeout 180
 ```
 
 ## 看结果
@@ -162,7 +162,7 @@ LiteLLM 重试关闭时，正常非流式测试的新增上游调用数应与请
 ## 停止与本次验证
 
 ```powershell
-docker compose -f docker-compose.benchmark.yml down
+docker compose -f deploy/docker-compose.benchmark.yml down
 ```
 
 只停止并移除这个独立测试项目的容器和网络，runtime 中的报告和配置保留。

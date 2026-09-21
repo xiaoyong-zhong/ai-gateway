@@ -24,7 +24,7 @@ services:
   litellm:
     image: api-gateway-litellm:responses-empty-choices-v1
     build:
-      context: ./config/litellm-patch
+      context: ../gateway/litellm
     container_name: api-gateway-litellm
     restart: unless-stopped
     depends_on:
@@ -35,12 +35,12 @@ services:
       LITELLM_MASTER_KEY: sk-local-test
       DATABASE_URL: postgresql://llmproxy:dbpassword9090@db:5432/litellm
     env_file:
-      - path: ./.env
+      - path: ../.env
         required: false
     ports:
       - "4000:4000"
     volumes:
-      - ./config/litellm.yaml:/app/config.yaml:ro
+      - ../config/litellm.yaml:/app/config.yaml:ro
     networks:
       ai-gateway:
         aliases:
@@ -58,7 +58,7 @@ services:
       - "8080:8080"
       - "8443:8443"
     volumes:
-      - ./runtime/higress:/data
+      - ../runtime/higress:/data
     networks:
       ai-gateway:
         ipv4_address: 172.30.50.3

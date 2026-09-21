@@ -2,7 +2,7 @@ import asyncio
 import copy
 import unittest
 
-from gateway_responses_compat import callback
+from qwen_responses_compat import callback
 
 
 class QwenCompatibilityTests(unittest.TestCase):

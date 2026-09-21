@@ -24,8 +24,8 @@ of native Responses support at the upstream provider.
 Run from the repository root:
 
 ```powershell
-docker compose build litellm
-docker compose up -d --no-deps --no-build litellm
+docker compose -f deploy/docker-compose.yml build litellm
+docker compose -f deploy/docker-compose.yml up -d --no-deps --no-build litellm
 Invoke-WebRequest -UseBasicParsing http://localhost:4000/health/liveliness
 ```
 
@@ -64,7 +64,7 @@ re-audit instead of silently applying stale replacements.
 To revert only the streaming guards while retaining the Qwen request hook:
 
 ```powershell
-docker compose -f docker-compose.yml -f config/litellm-patch/compose.rollback.yml up -d --no-deps --no-build litellm
+docker compose -f deploy/docker-compose.yml -f gateway/litellm/rollback/compose.rollback.yml up -d --no-deps --no-build litellm
 ```
 
 For a full rollback, also remove `gateway_responses_compat.callback` from the
