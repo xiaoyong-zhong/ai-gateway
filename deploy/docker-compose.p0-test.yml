@@ -78,7 +78,9 @@ services:
     ports:
       - "127.0.0.1:18001:8001"
       - "127.0.0.1:18080:8080"
-      - "127.0.0.1:18000:15000"
+      # Prometheus shares Higress' network namespace; publish its UI here so
+      # the Envoy admin listener itself remains unexposed to the host.
+      - "127.0.0.1:19090:9090"
     volumes:
       - ../runtime/p0-test/higress:/data
       - ../scripts:/p0-scripts:ro
@@ -94,6 +96,22 @@ services:
       p0-gateway:
         ipv4_address: 172.30.52.3
 
+  prometheus:
+    image: prom/prometheus@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    restart: unless-stopped
+    depends_on:
+      higress:
+        condition: service_healthy
+    network_mode: service:higress
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.listen-address=0.0.0.0:9090
+    volumes:
+      - ../config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - p0_prometheus_data:/prometheus
+
   log-pruner:
     image: postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
     restart: unless-stopped
@@ -103,18 +121,33 @@ services:
     environment:
       PGPASSWORD: ${P0_POSTGRES_PASSWORD:?Run scripts/Initialize-P0TestEnvironment.ps1 first}
       P0_LOG_RETENTION_DAYS: ${P0_LOG_RETENTION_DAYS:-7}
+      P0_LOG_PRUNE_INTERVAL_SECONDS: ${P0_LOG_PRUNE_INTERVAL_SECONDS:-86400}
     command:
       - /bin/sh
       - -ec
       - |
         case "$${P0_LOG_RETENTION_DAYS}" in
-          ''|*[!0-9]*) echo 'P0_LOG_RETENTION_DAYS must be a non-negative integer' >&2; exit 2 ;;
+          ''|*[!0-9]*|0) echo 'P0_LOG_RETENTION_DAYS must be a positive integer' >&2; exit 2 ;;
+        esac
+        case "$${P0_LOG_PRUNE_INTERVAL_SECONDS}" in
+          ''|*[!0-9]*|0) echo 'P0_LOG_PRUNE_INTERVAL_SECONDS must be a positive integer' >&2; exit 2 ;;
         esac
         while true; do
-          psql -h db -U llmproxy -d litellm -v ON_ERROR_STOP=1 \
-            -c "DELETE FROM \"LiteLLM_SpendLogs\" WHERE \"endTime\" < NOW() - (INTERVAL '1 day' * $${P0_LOG_RETENTION_DAYS});"
-          sleep 86400
+          if psql -h db -U llmproxy -d litellm -v ON_ERROR_STOP=1 \
+            -c "DELETE FROM \"LiteLLM_SpendLogs\" WHERE \"endTime\" < NOW() - (INTERVAL '1 day' * $${P0_LOG_RETENTION_DAYS});"; then
+            echo "P0 SpendLogs retention pass completed (days=$${P0_LOG_RETENTION_DAYS})."
+            sleep "$${P0_LOG_PRUNE_INTERVAL_SECONDS}"
+          else
+            echo 'P0 SpendLogs retention pass failed; retrying in 30 seconds.' >&2
+            sleep 30
+          fi
         done
+    healthcheck:
+      test: ["CMD-SHELL", "psql -h db -U llmproxy -d litellm -tAc 'SELECT 1' >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       p0-gateway:
         ipv4_address: 172.30.52.6
@@ -131,3 +164,5 @@ volumes:
     name: api-gateway-p0-test-postgres
   p0_redis_data:
     name: api-gateway-p0-test-redis
+  p0_prometheus_data:
+    name: api-gateway-p0-test-prometheus

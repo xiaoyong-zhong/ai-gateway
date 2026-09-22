@@ -110,6 +110,22 @@ def configure_legacy_key(resources: list[dict], legacy_key: str) -> None:
         allow.remove("p0-legacy")
 
 
+def override_tpm_limit(resources: list[dict], limit: int | None) -> None:
+    """Apply a temporary test-only TPM override without editing tracked config."""
+    if limit is None:
+        return
+    if limit <= 0:
+        raise SystemExit("--tpm-limit must be a positive integer.")
+    plugin = next((item for item in resources if item.get("metadata", {}).get("name") == "p0-ai-token-rate-limit"), None)
+    if plugin is None:
+        raise SystemExit("P0 token rate-limit plugin is missing from the resource file.")
+    try:
+        config = plugin["spec"]["matchRules"][0]["config"]
+        config["rule_items"][0]["limit_keys"][0]["token_per_minute"] = limit
+    except (KeyError, IndexError, TypeError) as error:
+        raise SystemExit("P0 token rate-limit resource has an unexpected structure.") from error
+
+
 def apply_resource(opener, resource: dict) -> None:
     key = (resource["apiVersion"], resource["kind"])
     collection = RESOURCE_PATHS.get(key)
@@ -137,6 +153,8 @@ def main() -> int:
     parser.add_argument("--resource-file", type=Path, default=RESOURCE_FILE)
     parser.add_argument("--include-ip-restriction", action="store_true",
                         help="Also apply ip-restriction.json (requires IP Restriction file)")
+    parser.add_argument("--tpm-limit", type=int,
+                        help="Temporary test-only override for P0 TPM validation; never edits the source JSON")
     args = parser.parse_args()
     variables = load_env(args.env_file)
     resources = substitute(json.loads(args.resource_file.read_text(encoding="utf-8")), variables)
@@ -150,6 +168,7 @@ def main() -> int:
         resources.extend(ip_resources)
 
     configure_legacy_key(resources, variables.get("P0_HIGRESS_LEGACY_CONSUMER_KEY", ""))
+    override_tpm_limit(resources, args.tpm_limit)
     context = ssl._create_unverified_context()
     opener = build_opener(ProxyHandler({}), HTTPSHandler(context=context))
     wait_for_api(opener)
