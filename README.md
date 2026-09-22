@@ -97,6 +97,16 @@ Invoke-RestMethod `
 
 直接访问 LiteLLM 时，将 URL 改为 `http://localhost:4000/v1/chat/completions`。
 
+## P0 本地隔离环境验证台
+
+当前 Higress → LiteLLM → Qwen 的 P0 隔离环境、CCSwitch 地址和浏览器验证台见 [`doc/P0本地测试环境操作手册.md`](doc/P0本地测试环境操作手册.md)。启动隔离环境后，可运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/Start-P0Console.ps1
+```
+
+验证台仅监听 `127.0.0.1:18770`，提供服务状态、认证/路由断言、Chat/SSE/Responses/工具调用、LiteLLM SpendLogs 摘要、Envoy 指标和完整 P0 验收入口。完整验收会调用测试模型并消耗 Token。
+
 ## 模型配置
 
 模型别名和上游地址位于 [`config/litellm.yaml`](config/litellm.yaml)。当前配置包含 DashScope、校园 AIGC、DeepSeek 和 Agnes AI 的示例。修改后重启：
