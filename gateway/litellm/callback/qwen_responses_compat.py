@@ -1,8 +1,54 @@
-"""Model-scoped request adaptation for the Qwen gateway's single-system template."""
+"""Request adaptation for providers that require a single system message."""
 
 from typing import Any
 
 from litellm.integrations.custom_logger import CustomLogger
+
+
+CHAT_CALL_TYPES = {
+    "acompletion",
+    "completion",
+    "anthropic_messages",
+    "aanthropic_messages",
+}
+
+
+def _text_content(content: Any) -> str | None:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list) and all(
+        isinstance(part, dict)
+        and part.get("type") in ("text", "input_text")
+        and isinstance(part.get("text"), str)
+        for part in content
+    ):
+        return "\n".join(part["text"] for part in content)
+    return None
+
+
+def merge_chat_system_messages(data: dict[str, Any]) -> dict[str, Any]:
+    messages = data.get("messages")
+    if not isinstance(messages, list):
+        return data
+
+    system_parts: list[str] = []
+    remaining: list[Any] = []
+    for message in messages:
+        if not isinstance(message, dict):
+            return data
+        if message.get("role") in ("system", "developer"):
+            content = _text_content(message.get("content"))
+            if content is None:
+                return data
+            system_parts.append(content)
+        else:
+            remaining.append(message)
+
+    if not system_parts:
+        return data
+    normalized = [{"role": "system", "content": "\n\n".join(system_parts)}]
+    normalized.extend(remaining)
+    return {**data, "messages": normalized}
 
 
 def merge_leading_instructions(data: dict[str, Any]) -> dict[str, Any]:
@@ -35,11 +81,13 @@ def merge_leading_instructions(data: dict[str, Any]) -> dict[str, Any]:
     return {**data, "instructions": "\n\n".join(parts), "input": inputs[count:]}
 
 
-class QwenResponsesCompatibility(CustomLogger):
+class GatewayRequestCompatibility(CustomLogger):
     async def async_pre_call_hook(self, user_api_key_dict, cache, data, call_type):
-        if call_type != "aresponses" or data.get("model") != "my-qwen3.6-27b":
-            return data
-        return merge_leading_instructions(data)
+        if call_type == "aresponses":
+            return merge_leading_instructions(data)
+        if call_type in CHAT_CALL_TYPES:
+            return merge_chat_system_messages(data)
+        return data
 
 
-callback = QwenResponsesCompatibility()
+callback = GatewayRequestCompatibility()

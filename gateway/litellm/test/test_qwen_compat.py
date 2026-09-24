@@ -36,14 +36,87 @@ class QwenCompatibilityTests(unittest.TestCase):
         self.assertEqual(self.apply(result), result)
 
     def test_chat_completions_and_other_call_types_are_untouched(self):
-        for call_type in ("acompletion", "completion", "aembedding", "aresponses_compact"):
+        for call_type in ("aembedding", "aresponses_compact"):
             request = self.request()
             self.assertIs(self.apply(request, call_type), request)
+
+    def test_chat_system_messages_are_merged_and_order_is_preserved(self):
+        request = {
+            "model": "my-qwen3.6-27b",
+            "messages": [
+                {"role": "system", "content": "First rule"},
+                {"role": "user", "content": "Question"},
+                {"role": "system", "content": "Later rule"},
+                {"role": "assistant", "content": "Working"},
+                {"role": "tool", "tool_call_id": "call_1", "content": "Result"},
+                {"role": "developer", "content": "Final rule"},
+            ],
+            "tools": [{"type": "function", "function": {"name": "probe"}}],
+        }
+        result = self.apply(request, "acompletion")
+        self.assertEqual(
+            result["messages"],
+            [
+                {"role": "system", "content": "First rule\n\nLater rule\n\nFinal rule"},
+                {"role": "user", "content": "Question"},
+                {"role": "assistant", "content": "Working"},
+                {"role": "tool", "tool_call_id": "call_1", "content": "Result"},
+            ],
+        )
+        self.assertEqual(result["tools"], request["tools"])
+
+    def test_chat_and_anthropic_call_types_are_normalized(self):
+        for call_type in ("completion", "anthropic_messages", "aanthropic_messages"):
+            request = {
+                "model": "my-qwen3.6-27b",
+                "messages": [
+                    {"role": "user", "content": "Question"},
+                    {"role": "system", "content": "Rule"},
+                ],
+            }
+            result = self.apply(request, call_type)
+            self.assertEqual(result["messages"][0]["role"], "system")
+            self.assertEqual(result["messages"][0]["content"], "Rule")
+
+    def test_chat_nontext_system_content_is_untouched(self):
+        request = {
+            "model": "my-qwen3.6-27b",
+            "messages": [
+                {"role": "system", "content": [{"type": "image_url", "image_url": {}}]},
+                {"role": "user", "content": "Question"},
+            ],
+        }
+        self.assertIs(self.apply(request, "acompletion"), request)
 
     def test_other_models_are_untouched(self):
         request = self.request()
         request["model"] = "my-kimi-k2.7-code"
-        self.assertIs(self.apply(request), request)
+        self.assertIs(self.apply(request, "aembedding"), request)
+
+    def test_responses_normalization_is_model_agnostic(self):
+        request = self.request()
+        request["model"] = "my-kimi-k2.7-code"
+        result = self.apply(request)
+        self.assertEqual(result["instructions"], "Base instructions\n\nFirst rule\n\nSecond rule")
+        self.assertEqual(result["input"], request["input"][1:])
+
+    def test_chat_normalization_is_model_agnostic(self):
+        request = {
+            "model": "my-kimi-k2.7-code",
+            "messages": [
+                {"role": "system", "content": "First rule"},
+                {"role": "user", "content": "Question"},
+                {"role": "system", "content": "Later rule"},
+            ],
+        }
+        result = self.apply(request, "acompletion")
+        self.assertEqual(
+            result["messages"],
+            [
+                {"role": "system", "content": "First rule\n\nLater rule"},
+                {"role": "user", "content": "Question"},
+            ],
+        )
 
     def test_plain_input_is_untouched(self):
         request = self.request()
