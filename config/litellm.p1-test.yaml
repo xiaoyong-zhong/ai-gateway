@@ -1,0 +1,65 @@
+model_list:
+  - model_name: my-qwen3.7-flash-2026-07-15
+    litellm_params:
+      model: openai/qwen3.7-flash-2026-07-15
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/DASHSCOPE_API_KEY
+      use_chat_completions_api: true
+
+  - model_name: my-qwen3.5-ocr
+    litellm_params:
+      model: openai/qwen3.5-ocr
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/DASHSCOPE_API_KEY
+      use_chat_completions_api: true
+
+  - model_name: my-qwen3.7-flash
+    litellm_params:
+      model: openai/qwen3.7-flash
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/DASHSCOPE_API_KEY
+      use_chat_completions_api: true
+
+  - model_name: my-qwen3.7-text-embedding
+    litellm_params:
+      model: openai/qwen3.7-text-embedding
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/DASHSCOPE_API_KEY
+
+  - model_name: my-qwen3.6-27b
+    litellm_params:
+      model: openai/Qwen3.6-27B
+      api_base: https://test2-aigc.campusapp.com.cn/api/v1
+      api_key: os.environ/ZHILIN_aigc_API_KEY
+      use_chat_completions_api: true
+
+  - model_name: my-deepseek-v4-flash
+    litellm_params:
+      model: openai/deepseek-v4-flash
+      api_base: https://api.deepseek.com/
+      api_key: os.environ/DEEPSEEK_API_KEY
+      use_chat_completions_api: true
+
+  - model_name: my-agnes-2.5-pro
+    litellm_params:
+      model: openai/agnes-2.5-pro
+      api_base: https://apihub.agnes-ai.com/v1
+      api_key: os.environ/AGNES_API_KEY
+      use_chat_completions_api: true
+
+  - model_name: my-agnes-image-2.5-flash
+    litellm_params:
+      model: openai/agnes-image-2.5-flash
+      api_base: https://apihub.agnes-ai.com/v1
+      api_key: os.environ/AGNES_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  store_model_in_db: true
+  store_prompts_in_spend_logs: true
+
+litellm_settings:
+  drop_params: true
+  store_audit_logs: true
+  callbacks:
+    - qwen_responses_compat.callback

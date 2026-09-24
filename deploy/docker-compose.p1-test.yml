@@ -1,0 +1,140 @@
+name: api-gateway-p1-test
+
+services:
+  db:
+    image: postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: llmproxy
+      POSTGRES_PASSWORD: ${P1_POSTGRES_PASSWORD:?Run scripts/Initialize-P1TestEnvironment.ps1 first}
+    volumes:
+      - p1_litellm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llmproxy -d litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      p1-gateway:
+        ipv4_address: 172.30.53.5
+
+  litellm:
+    image: api-gateway-litellm:p1-test
+    build:
+      context: ../gateway/litellm
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${P1_LITELLM_MASTER_KEY:?Run scripts/Initialize-P1TestEnvironment.ps1 first}
+      LITELLM_STORE_AUDIT_LOGS: "true"
+      DATABASE_URL: postgresql://llmproxy:${P1_POSTGRES_PASSWORD}@db:5432/litellm
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      NO_PROXY: "*"
+    env_file:
+      - path: ../.env
+        required: false
+    volumes:
+      - ../config/litellm.p1-test.yaml:/app/config.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os, urllib.request; r=urllib.request.Request('http://localhost:4000/v1/models', headers={'Authorization':'Bearer '+os.environ['LITELLM_MASTER_KEY']}); assert urllib.request.urlopen(r, timeout=3).status == 200\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 25s
+    networks:
+      p1-gateway:
+        ipv4_address: 172.30.53.2
+
+  mapper:
+    image: api-gateway-p1-mapper:test
+    build:
+      context: ../gateway/p1-mapper
+    restart: unless-stopped
+    secrets:
+      - p1_key_derivation_secret
+    volumes:
+      - ../config/p1-test/apps.json:/app/apps.json:ro
+    environment:
+      P1_APPS_FILE: /app/apps.json
+      P1_DERIVATION_SECRET_FILE: /run/secrets/p1_key_derivation_secret
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; assert urllib.request.urlopen('http://127.0.0.1:8081/healthz', timeout=2).status == 200"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      p1-gateway:
+        ipv4_address: 172.30.53.4
+
+  higress:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/all-in-one@sha256:930b314be06e4b435617a39ac8dc8f17c9d60a4faf2c96aa7aafe9e85381ad9b
+    restart: unless-stopped
+    depends_on:
+      litellm:
+        condition: service_healthy
+      mapper:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:28001:8001"
+      - "127.0.0.1:28080:8080"
+      - "127.0.0.1:29090:15090"
+    volumes:
+      - ../runtime/p1-test/higress:/data
+      - ../scripts:/p1-scripts:ro
+      - ../config/higress/p1-test:/p1-config:ro
+      - ../.env.p1-higress-test:/p1-env/.env.p1-higress-test:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -kfsS --max-time 3 https://127.0.0.1:18443/version >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    networks:
+      p1-gateway:
+        ipv4_address: 172.30.53.3
+
+  log-pruner:
+    image: postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+    restart: unless-stopped
+    depends_on:
+      litellm:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${P1_POSTGRES_PASSWORD:?Run scripts/Initialize-P1TestEnvironment.ps1 first}
+      P1_LOG_RETENTION_DAYS: ${P1_LOG_RETENTION_DAYS:-7}
+      P1_LOG_PRUNE_INTERVAL_SECONDS: ${P1_LOG_PRUNE_INTERVAL_SECONDS:-86400}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        case "$${P1_LOG_RETENTION_DAYS}" in ''|*[!0-9]*|0) exit 2 ;; esac
+        case "$${P1_LOG_PRUNE_INTERVAL_SECONDS}" in ''|*[!0-9]*|0) exit 2 ;; esac
+        while true; do
+          psql -h db -U llmproxy -d litellm -v ON_ERROR_STOP=1 \
+            -c "DELETE FROM \"LiteLLM_SpendLogs\" WHERE \"endTime\" < NOW() - (INTERVAL '1 day' * $${P1_LOG_RETENTION_DAYS});" || true
+          sleep "$${P1_LOG_PRUNE_INTERVAL_SECONDS}"
+        done
+    networks:
+      p1-gateway:
+        ipv4_address: 172.30.53.6
+
+networks:
+  p1-gateway:
+    name: api-gateway-p1-test-network
+    ipam:
+      config:
+        - subnet: 172.30.53.0/24
+
+volumes:
+  p1_litellm_postgres_data:
+    name: api-gateway-p1-test-postgres
+
+secrets:
+  p1_key_derivation_secret:
+    file: ../runtime/p1-test/secrets/p1_key_derivation_secret
