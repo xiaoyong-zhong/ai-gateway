@@ -1,0 +1,77 @@
+﻿{
+    "version":  1,
+    "applications":  [
+                         {
+                             "app_id":  "app-401f743d-0c35-4e10-bf2c-7e6071e813a1",
+                             "display_name":  "P1 Technical Gate App A",
+                             "higress_key_env":  "P1_HIGRESS_KEY_APP_401F743D_0C35_4E10_BF2C_7E6071E813A1_KEY",
+                             "models":  [
+                                            "my-qwen3.7-flash-2026-07-15",
+                                            "my-qwen3.5-ocr",
+                                            "my-qwen3.7-flash",
+                                            "my-qwen3.7-text-embedding",
+                                            "my-qwen3.6-27b",
+                                            "my-deepseek-v4-flash",
+                                            "my-agnes-2.5-pro",
+                                            "my-agnes-image-2.5-flash"
+                                        ],
+                             "rpm_limit":  60,
+                             "tpm_limit":  600000,
+                             "max_parallel_requests":  100
+                         },
+                         {
+                             "app_id":  "app-979432ae-7b09-4fdc-91d8-5d02d1c82a69",
+                             "display_name":  "P1 Technical Gate App B",
+                             "higress_key_env":  "P1_HIGRESS_KEY_APP_979432AE_7B09_4FDC_91D8_5D02D1C82A69_KEY",
+                             "models":  [
+                                            "my-qwen3.6-27b",
+                                            "my-qwen3.7-flash-2026-07-15",
+                                            "my-qwen3.5-ocr",
+                                            "my-qwen3.7-flash",
+                                            "my-qwen3.7-text-embedding",
+                                            "my-deepseek-v4-flash",
+                                            "my-agnes-2.5-pro",
+                                            "my-agnes-image-2.5-flash"
+                                        ],
+                             "rpm_limit":  3,
+                             "tpm_limit":  3000,
+                             "max_parallel_requests":  1
+                         },
+                         {
+                             "app_id":  "app-3f9c7b21-6b5e-4d8a-9c31-2e7a6f5b4c10",
+                             "display_name":  "P1 持久化重启验证应用",
+                             "higress_key_env":  "P1_HIGRESS_KEY_APP_3F9C7B21_6B5E_4D8A_9C31_2E7A6F5B4C10_KEY",
+                             "models":  [
+                                            "my-qwen3.6-27b",
+                                            "my-qwen3.7-flash-2026-07-15",
+                                            "my-qwen3.5-ocr",
+                                            "my-qwen3.7-flash",
+                                            "my-qwen3.7-text-embedding",
+                                            "my-deepseek-v4-flash",
+                                            "my-agnes-2.5-pro",
+                                            "my-agnes-image-2.5-flash"
+                                        ],
+                             "rpm_limit":  6,
+                             "tpm_limit":  6000,
+                             "max_parallel_requests":  1
+                         },
+                         {
+                             "app_id":  "app-1ac586ff-fe58-401c-af60-6b7994e5955c",
+                             "display_name":  "教学助手",
+                             "higress_key_env":  "P1_HIGRESS_KEY_APP_1AC586FF_FE58_401C_AF60_6B7994E5955C_KEY",
+                             "models":  [
+                                            "my-qwen3.6-27b",
+                                            "my-qwen3.7-flash-2026-07-15",
+                                            "my-qwen3.5-ocr",
+                                            "my-qwen3.7-flash",
+                                            "my-qwen3.7-text-embedding",
+                                            "my-deepseek-v4-flash",
+                                            "my-agnes-2.5-pro",
+                                            "my-agnes-image-2.5-flash"
+                                        ],
+                             "rpm_limit":  6,
+                             "tpm_limit":  6000,
+                             "max_parallel_requests":  1
+                         }
+                     ]
+}
